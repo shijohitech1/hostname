@@ -1,0 +1,153 @@
+on error resume next
+'''''''''''''''''''''''''''''''''''''HostName''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Dim hostname
+Set wshShell = CreateObject( "WScript.Shell" )
+strComputerName = wshShell.ExpandEnvironmentStrings( "%COMPUTERNAME%" )
+hostnamesys = strComputerName
+''''''''''''''''''''''''''''''''''''''''''''''Active/Not'''''''''''''''''''''''''''''''''''''
+Dim winactive
+Set ActiveService = GetObject("winmgmts:\\.\root\cimv2") 
+Set ActiveItems = ActiveService.ExecQuery("Select * From SoftwareLicensingProduct where Name like '%Windows%'") 
+For Each objItem In ActiveItems 
+    If objItem.PartialProductKey <> "null" Then 
+        value = int(objItem.LicenseStatus) 
+	End If
+Next
+if value =1 then
+winactive = "Active" 
+else
+winactive =  "Not Active" 
+End If
+''''''''''''''''''''''''''''''''''''''''''''''Memory'''''''''''''''''''''''''''''''''''''
+dim ram2, ramtype, ramsize(6), rams
+dim t, ramcap
+strComputer = "."
+Set objWMIService = GetObject("winmgmts:" _
+    & "{impersonationLevel=impersonate}!\\" & strComputer & "\root\cimv2")
+Set colItems = objWMIService.ExecQuery("Select * from Win32_PhysicalMemory")
+rams =""
+For Each objItem in colItems
+ 		If objItem.MemoryType = 24 Then
+		ramtype = "DDR3"
+		ElseIf objItem.MemoryType = 0 Then
+		ramtype = "DDR4"
+		Else
+		ramtype = "DDR2"
+		End If
+		ramcap = (objItem.Capacity/1024)/1024
+		if ramcap > 8000 and ramcap < 9000 Then
+		ramsize(t) = "8GB "
+		rams = rams & " " & ramsize(t)
+		ElseIf ramcap > 4000 and ramcap < 5000 Then
+		ramsize(t) = "4GB "
+		Else 
+		ramsize(t) = "2GB" 
+		end if
+		If objItem.FormFactor = 8 Then
+		systemtype = "Desktop"
+		ElseIf objItem.FormFactor = 16 Then
+		systemtype = "Laptop"
+		Else
+		systemtype = "Laptop"
+		End If
+	ram2=objItem.Manufacturer & "" & ramtype
+	t=t+1
+Next
+rams = ramsize(0) & " " & ramsize(1) & " " & ramsize(2) & " " & ramsize(3)
+'''''''''''''''''''''''''''''''''''''''''''''''Operating System''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Set dtmConvertedDate = CreateObject("WbemScripting.SWbemDateTime")
+Dim os
+Set colOperatingSystems = objWMIService.ExecQuery _
+("Select * from Win32_OperatingSystem")
+For Each objOperatingSystem in colOperatingSystems
+os = objOperatingSystem.Caption
+Next
+'''''''''''''''''''''''''''''''''''''''''''''''Windows Key''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Dim winkey
+Set WshShell = WScript.CreateObject("WScript.Shell")
+KeyPath = "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\DigitalProductId"
+winkey = ExtractKey(WshShell.RegRead(KeyPath))
+Function ExtractKey(KeyInput)
+    Const KeyOffset = 52
+    i = 28
+    CharWhitelist = "BCDFGHJKMPQRTVWXY2346789"
+    Do
+        Cur = 0
+        x = 14
+        Do
+            Cur = Cur * 256
+            Cur = KeyInput(x + KeyOffset) + Cur
+            KeyInput(x + KeyOffset) = (Cur \ 24) And 255
+            Cur = Cur Mod 24
+            x = x -1
+        Loop While x >= 0
+        i = i -1
+        KeyOutput = Mid(CharWhitelist, Cur + 1, 1) & KeyOutput
+        If (((29 - i) Mod 6) = 0) And (i <> -1) Then
+            i = i -1
+            KeyOutput = "-" & KeyOutput
+        End If
+    Loop While i >= 0
+    ExtractKey = KeyOutput
+End Function
+
+'''''''''''''''''''''''''''''''''''''''''''''''User Name''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Set wshShell = CreateObject( "WScript.Shell" )
+strUserName = wshShell.ExpandEnvironmentStrings( "%USERNAME%" )
+'''''''''''''''''''''''''''''''''''''''''''''''Full Name''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Dim objSysInfo1, objUser1, fullname
+Set objSysInfo1 = CreateObject("ADSystemInfo")
+Set objUser1 = GetObject("LDAP://" & objSysInfo1.UserName)
+fullname = objUser1.displayName
+''''''''''''''''''''''''''''''''''IP Address & MAC Address'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+dim NIC1, Nic, StrIP, CompName, macIP
+Set NIC1 =     GetObject("winmgmts:").InstancesOf("Win32_NetworkAdapterConfiguration")
+For Each Nic in NIC1
+    if Nic.IPEnabled then
+        StrIP = Nic.IPAddress(0)
+		macIP = Nic.MACAddress(0)
+    End if
+Next
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''CSV'''''''''''''''''''''''''''''''''''''''''''''''''''''''
+strExcelPath = "\\10.10.50.10\MWT Group\Shijo\hosts\hostnames.csv"
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+Set objFile = objFSO.OpenTextFile(strExcelPath, 1)
+Set ObjFileII = objFSO.OpenTextFile(strExcelPath, 1)
+Set ObjFileIII = objFSO.OpenTextFile(strExcelPath, 1)
+Do Until objFileIII.AtEndOfStream
+strSearchStringI = objFileIII.ReadLine
+strI = InStr(strSearchStringI, hostnamesys) 
+If strI <> 0 Then
+ hostnameI = hostnamesys
+ 'msgbox(hostnameI)
+ End If
+Loop
+if hostnameI = hostnamesys Then
+ i=0
+ Do Until objFile.AtEndOfStream
+ strSearchString = objFile.ReadLine
+ str = InStr(strSearchString, hostnamesys) 
+ If str <> 0 Then
+  woo(i)
+  Exit Do
+  End If
+  i=i+1
+ Loop
+	function woo(n)
+	 strcontents = objFileII.ReadAll
+	 arrRows = split(strContents, vbNewLine)
+	 arrRows(n) =  fullName & " , " & strUserName &" , " & strComputerName &" , " & strIP &" , " & macIP &" , "& os &" , " & winkey &" , " & winactive &" , "& systemtype &" , " & ram2 &" , " & rams
+	 'arrRows(n) =  fullName & " = " & strUserName &" = " & strComputerName &" = " & strIP &" = " & macIP &" = "& os &" = " & winkey &" = " & winactive &" = "& systemtype &" = " & ram2 &" = " & rams
+	 strContents = join(arrRows, vbNewLine)
+	 set objOutFile = objFSO.OpenTextFile(strExcelPath, 2)
+	 objOutFile.WriteLine strContents
+	 objOutFile.close
+	end function
+ 
+ else
+  Const ForReading = 1, ForWriting = 2, ForAppending = 8
+  Set filetxt = objFSO.OpenTextFile(strExcelPath, ForAppending, True) 
+  filetxt.Write vbNewLine & fullName & " , " & strUserName &" , " & strComputerName &" , " & strIP &" , " & macIP &" , " & os &" , " & winkey &" , " & winactive &" , "& systemtype &" , " & ram2 &" , " & rams
+  'filetxt.Write vbNewLine & fullName & " = " & strUserName &" = " & strComputerName &" = " & strIP &" = " & macIP &" = " & os &" = " & winkey &" = " & winactive &" = "& systemtype &" = " & ram2 &" = " & rams
+  filetxt.Close 
+end if
